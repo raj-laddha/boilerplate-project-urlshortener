@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const dns = require('dns');
+const URL = require('url').URL;
 const mongoose = require('mongoose');
 
 mongoose.connect(process.env.MONGO_URI, {useNewUrlParser: true, useUnifiedTopology: true}, (err) => {
@@ -39,14 +40,24 @@ app.post('/api/shorturl', (req, res) => {
     return res.json({error: 'invalid url'});
   }
 
-  let url = req.body.url.replace(REGEX, '');
+  let domain;
+  let url;
 
-  dns.lookup(url, (err) => {
+  try {
+    let urlObj = new URL(req.body.url);
+    domain = urlObj.domain;
+    url = urlObj.href;
+    
+  } catch (err) {
+    return res.json({error: 'invalid url'});
+  }
+
+  dns.lookup(domain, (err) => {
     if (err) {
       return res.json({error: err.code});
     }
 
-    Url.findUrl(req.body.url, (err, data) => {
+    Url.findUrl(url, (err, data) => {
       if (err) return console.log(err);
 
       if (!data) {
@@ -54,7 +65,7 @@ app.post('/api/shorturl', (req, res) => {
           if (err) return console.log(err);
 
           let urlDoc = new Url({
-            url: req.body.url,
+            url: url,
             short: count+1
           });
 
@@ -62,7 +73,7 @@ app.post('/api/shorturl', (req, res) => {
             if (err) return console.log(err);
 
             res.json({
-              original_url: req.body.url,
+              original_url: url,
               short_url: count+1
             });
           });
@@ -71,7 +82,7 @@ app.post('/api/shorturl', (req, res) => {
 
       } else {
         res.json({
-          original_url: req.body.url,
+          original_url: url,
           short_url: data.short
         });
       }
